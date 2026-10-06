@@ -12,8 +12,12 @@ from src.database.db import (
     get_all_students,
     create_student,
     get_student_pk,
-    get_student_attendance_summary
+    get_student_attendance_summary,
+    get_attendance_session_by_id,
+    is_student_enrolled_in_subject,
+    mark_qr_attendance
 )
+from src.pipelines.qr_pipeline import decode_qr_from_image_file, verify_qr_token
 
 def student_screen():
     style_background_dashboard()
@@ -144,6 +148,40 @@ def student_dashboard():
             st.subheader(f"{overall_pct}%")
 
     st.divider()
+
+    st.subheader("QR Quick Check-in")
+    st.caption("Scan your teacher QR to mark attendance for a live class session.")
+    qr_capture = st.camera_input("Scan Attendance QR", key="student_qr_scan")
+
+    if qr_capture and st.button("Process QR Check-in", type="primary", key="student_qr_submit"):
+        raw_token = decode_qr_from_image_file(qr_capture)
+        if not raw_token:
+            st.warning("Could not decode QR. Try better lighting and hold camera steady.")
+        else:
+            ok, msg, payload = verify_qr_token(raw_token)
+            if not ok:
+                st.error(msg)
+            else:
+                session_id = payload.get("session_id")
+                subject_id = payload.get("subject_id")
+
+                session = get_attendance_session_by_id(session_id)
+                if not session:
+                    st.error("QR session does not exist.")
+                elif session.get("subject_id") != subject_id:
+                    st.error("Session data mismatch. Please ask your teacher to regenerate QR.")
+                else:
+                    is_enrolled = is_student_enrolled_in_subject(subject_id, student_id)
+                    if not is_enrolled:
+                        st.error("You are not enrolled in this subject.")
+                    else:
+                        success, mark_msg = mark_qr_attendance(session_id, student_id)
+                        if success:
+                            st.success(mark_msg)
+                            st.toast("QR attendance completed.", icon="✅")
+                        else:
+                            st.error(mark_msg)
+
     st.subheader("📚 Subject-wise Attendance Breakdown")
 
     if not subjects_summary:

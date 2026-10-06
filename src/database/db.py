@@ -295,6 +295,79 @@ def get_session_records(session_id):
         st.error(f"Database error fetching session records: {e}")
         return []
 
+def get_attendance_session_by_id(session_id):
+    try:
+        res = supabase.table("attendance_sessions").select("*").eq("session_id", session_id).execute()
+        if res.data:
+            return res.data[0]
+
+        res_alt = supabase.table("attendance_sessions").select("*").eq("id", session_id).execute()
+        if res_alt.data:
+            return res_alt.data[0]
+    except Exception as e:
+        st.error(f"Database error loading attendance session: {e}")
+    return None
+
+def is_student_enrolled_in_subject(subject_id, student_id):
+    try:
+        res = (
+            supabase
+            .table("subject_students")
+            .select("id")
+            .eq("subject_id", subject_id)
+            .eq("student_id", student_id)
+            .execute()
+        )
+        return bool(res.data)
+    except Exception as e:
+        st.error(f"Database error checking enrollment: {e}")
+        return False
+
+def mark_qr_attendance(session_id, student_id):
+    """
+    Mark a student present for a QR session.
+    Returns tuple: (success: bool, message: str)
+    """
+    try:
+        existing = (
+            supabase
+            .table("attendance_records")
+            .select("record_id,status")
+            .eq("session_id", session_id)
+            .eq("student_id", student_id)
+            .execute()
+        )
+
+        if existing.data:
+            row = existing.data[0]
+            if row.get("status") == "present":
+                return True, "Attendance already marked as present."
+
+            rec_id = row.get("record_id")
+            if rec_id is not None:
+                supabase.table("attendance_records").update({
+                    "status": "present",
+                    "method": "qr"
+                }).eq("record_id", rec_id).execute()
+            else:
+                supabase.table("attendance_records").update({
+                    "status": "present",
+                    "method": "qr"
+                }).eq("session_id", session_id).eq("student_id", student_id).execute()
+
+            return True, "Attendance updated to present."
+
+        supabase.table("attendance_records").insert({
+            "session_id": session_id,
+            "student_id": student_id,
+            "status": "present",
+            "method": "qr",
+            "confidence_score": None
+        }).execute()
+        return True, "Attendance marked present."
+    except Exception as e:
+        return False, f"Failed to mark attendance: {e}"
+
 def get_subject_attendance_summary(subject_id):
     """
     Calculate summary stats for each student enrolled in a subject.

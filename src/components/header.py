@@ -6,10 +6,11 @@ def header_home():
     logo_url = "https://i.ibb.co/YTYGn5qV/logo.png"
     
     st.markdown(f""" 
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center;margin-bottom:30px; margin-top:30px">
-           <img src='{logo_url}' style='height:100px;' />
-           <h1 style='text-align:center; color:#E0E3FF'>IIIT<br/>ATTANDANCE </h1>
-    </div>
+        <div class="brand-home-wrap">
+            <img src='{logo_url}' class='brand-home-logo' />
+            <h1 class='brand-home-title'>IIIT<br/>ATTENDANCE</h1>
+            <p class='brand-home-subtitle'>Smart attendance with face and voice intelligence</p>
+        </div>
                 """, unsafe_allow_html=True)
 
 
@@ -18,8 +19,11 @@ def header_dashboard():
     logo_url = "https://i.ibb.co/YTYGn5qV/logo.png"
     
     st.markdown(f""" 
-        <div style="display:flex; align-items:center; justify-content:center;gap:10px">
-           <img src='{logo_url}' style='height:85px;' />
-           <h2 style='text-align:left; color:#5865F2'>IIIT<br/>ATTANDANCE </h1>
-    </div>
+        <div class="brand-dash-wrap">
+           <img src='{logo_url}' class='brand-dash-logo' />
+           <div>
+             <h2 class='brand-dash-title'>IIIT<br/>ATTENDANCE</h2>
+             <p class='brand-dash-subtitle'>Realtime AI Attendance Suite</p>
+           </div>
+        </div>
                 """, unsafe_allow_html=True)

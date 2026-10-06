@@ -22,7 +22,9 @@ from src.database.db import (
     set_subject_roster,
     get_subject_attendance_summary,
     get_subject_sessions,
-    get_session_records
+    get_session_records,
+    create_attendance_session,
+    get_session_pk
 )
 from src.pipelines.face_pipeline import predict_attendance
 from src.pipelines.voice_pipeline import process_bulk_audio
@@ -30,6 +32,7 @@ from src.services.attendance_service import (
     prepare_session_review,
     finalize_and_save_session
 )
+from src.pipelines.qr_pipeline import create_qr_token, qr_token_to_png_bytes
 
 # =========================================================
 # TEACHER SCREEN ENTRY POINT
@@ -208,7 +211,7 @@ def teacher_tab_take_attendance(teacher_id):
 
     st.info(f"Enrolled Students in Subject: **{len(enrolled)}**")
 
-    method = st.radio("Choose Identification Method", ["Face", "Voice", "Hybrid"], horizontal=True, key="att_method_radio")
+    method = st.radio("Choose Identification Method", ["Face", "Voice", "Hybrid", "QR"], horizontal=True, key="att_method_radio")
 
     # Session state for scanning result review
     if "review_state" not in st.session_state or st.session_state.get("review_subj_id") != selected_subj_id:
@@ -253,6 +256,35 @@ def teacher_tab_take_attendance(teacher_id):
         st.write("Manual / Hybrid Selection Mode")
         if st.button("Start Manual Roster Verification", type="primary", key="start_manual_btn"):
             st.session_state["review_state"] = prepare_session_review(selected_subj_id, [], {})
+
+    elif method == "QR":
+        st.info("Generate a time-limited QR code. Students scan it from their portal to self check-in.")
+        ttl_minutes = st.slider("QR validity (minutes)", min_value=1, max_value=15, value=5, step=1, key="qr_ttl_mins")
+
+        if st.button("Generate New QR Session", type="primary", key="gen_qr_session_btn"):
+            new_session = create_attendance_session(selected_subj_id, teacher_id, method="qr")
+            if not new_session:
+                st.error("Could not create attendance session for QR.")
+            else:
+                session_id = get_session_pk(new_session)
+                token = create_qr_token(
+                    subject_id=selected_subj_id,
+                    teacher_id=teacher_id,
+                    session_id=session_id,
+                    ttl_seconds=ttl_minutes * 60
+                )
+                st.session_state["active_qr_session"] = {
+                    "subject_id": selected_subj_id,
+                    "session_id": session_id,
+                    "token": token
+                }
+                st.toast("New QR session created.", icon="🧾")
+
+        active_qr = st.session_state.get("active_qr_session")
+        if active_qr and active_qr.get("subject_id") == selected_subj_id:
+            png = qr_token_to_png_bytes(active_qr.get("token"))
+            st.image(png, caption=f"Session #{active_qr.get('session_id')} QR", width=280)
+            st.caption("Students should scan this QR from their Student Dashboard.")
 
     # Review & Finalize Section
     review_state = st.session_state.get("review_state")
